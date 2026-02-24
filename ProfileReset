@@ -1,0 +1,77 @@
+#Vérifier si le script a été lancé avec un droit admin
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host "Ce script doit être exécuté en tant qu'administrateur." -ForegroundColor Red
+    $ElevatedProcess = New-Object System.Diagnostics.ProcessStartInfo "PowerShell"
+    $ElevatedProcess.Arguments = "& '" + $script:MyInvocation.MyCommand.Path + "'"
+    $ElevatedProcess.Verb = "runas"
+    try {
+    	[System.Diagnostics.Process]::Start($ElevatedProcess)
+        Read-Host "wait"
+    	
+    }catch{
+     Write-Host "An error occurred: $_" -ForegroundColor Red
+    }
+}
+
+#Demander un username
+$userName = Read-Host "Veuillez entrer le nom d'utilisateur pour le reset du Profil: "
+
+#Vérification si la session du username entré, est connectée.
+$sessionInfo = quser | Select-String $userName
+if ($sessionInfo) {
+    # Extraire l'ID de session de l'utilisateur
+    $sessionID = ($sessionInfo -split "\s+")[2]  # Le troisième élément est généralement l'ID de session
+    Write-Host "L'utilisateur $userName est actuellement connecté (Session ID: $sessionID). Déconnexion en cours..." -ForegroundColor Yellow
+
+    logoff $sessionID
+    Start-Sleep -Seconds 3
+
+#Dernière vérification que la session soit correctement fermée.
+    $sessionInfo = quser | Select-String $userName
+    if ($sessionInfo) {
+        Write-Host "Impossible de déconnecter l'utilisateur $userName. La suppression est annulée." -ForegroundColor Red
+        exit
+    } else {
+        Write-Host "L'utilisateur $userName a été déconnecté avec succès." -ForegroundColor Green
+    }
+} else {
+    Write-Host "L'utilisateur $userName n'est pas connecté." -ForegroundColor Green
+}
+
+#Suppression du username dans le Regedit
+$profileListPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"
+$profileKey = Get-ChildItem $profileListPath | Where-Object {
+    $profilePath = (Get-ItemProperty $_.PSPath).ProfileImagePath
+    $profilePath -like "*$userName"
+}
+
+if ($profileKey) {
+    Remove-Item -Path $profileKey.PSPath -Recurse -Force
+    Write-Host "L'utilisateur $userName a été supprimé du registre." -ForegroundColor Green
+} else {
+    Write-Host "Utilisateur $userName non trouvé dans le registre." -ForegroundColor Yellow
+}
+
+#Renommer le dossier du username en .old
+$profileFolder = "C:\Users\$userName"
+$profileFolderOld = "C:\Users\$userName.old"
+
+if (Test-Path $profileFolder) {
+    Rename-Item -Path $profileFolder -NewName $profileFolderOld
+    Write-Host "Le dossier de profil utilisateur $userName a été renommé en $userName.old." -ForegroundColor Green
+} else {
+    Write-Host "Le dossier de profil $userName n'a pas été trouvé." -ForegroundColor Yellow
+}
+
+Write-Host "Reset du profil complété avec succes!"
+$confirmation = Read-Host "Appuyez sur la touche entrée, pour quitter."
+
+if ($confirmation -eq 'exit' -or $confirmation -eq '') {
+
+    exit
+
+} else {
+
+    Write-Host "Veuillez cliquer sur la touche entrée, pour quitter!"
+    Read-Host "Appuyez sur entrée."
+}
