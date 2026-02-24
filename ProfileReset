@@ -1,6 +1,6 @@
-#Vérifier si le script a été lancé avec un droit admin
+#Verify that the script is running with administrative privileges
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host "Ce script doit être exécuté en tant qu'administrateur." -ForegroundColor Red
+    Write-Host "This script must be run as administrator." -ForegroundColor Red
     $ElevatedProcess = New-Object System.Diagnostics.ProcessStartInfo "PowerShell"
     $ElevatedProcess.Arguments = "& '" + $script:MyInvocation.MyCommand.Path + "'"
     $ElevatedProcess.Verb = "runas"
@@ -13,32 +13,32 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     }
 }
 
-#Demander un username
-$userName = Read-Host "Veuillez entrer le nom d'utilisateur pour le reset du Profil: "
+#Prompt the user to enter a username
+$userName = Read-Host "Please enter the username for the profile reset: "
 
-#Vérification si la session du username entré, est connectée.
+#Verify whether the session of the provided username is active
 $sessionInfo = quser | Select-String $userName
 if ($sessionInfo) {
-    # Extraire l'ID de session de l'utilisateur
-    $sessionID = ($sessionInfo -split "\s+")[2]  # Le troisième élément est généralement l'ID de session
-    Write-Host "L'utilisateur $userName est actuellement connecté (Session ID: $sessionID). Déconnexion en cours..." -ForegroundColor Yellow
+    # Extract the user's session ID
+    $sessionID = ($sessionInfo -split "\s+")[2]  # The third element is usually the session ID
+    Write-Host "The user $userName is currently logged in (Session ID: $sessionID). Logging off..." -ForegroundColor Yellow
 
     logoff $sessionID
     Start-Sleep -Seconds 3
 
-#Dernière vérification que la session soit correctement fermée.
+#Final check that the session has been properly closed
     $sessionInfo = quser | Select-String $userName
     if ($sessionInfo) {
-        Write-Host "Impossible de déconnecter l'utilisateur $userName. La suppression est annulée." -ForegroundColor Red
+        Write-Host "Unable to log off user $userName. Deletion canceled." -ForegroundColor Red
         exit
     } else {
-        Write-Host "L'utilisateur $userName a été déconnecté avec succès." -ForegroundColor Green
+        Write-Host "User $userName has been successfully logged off." -ForegroundColor Green
     }
 } else {
-    Write-Host "L'utilisateur $userName n'est pas connecté." -ForegroundColor Green
+    Write-Host "User $userName is not logged in." -ForegroundColor Green
 }
 
-#Suppression du username dans le Regedit
+#Delete the username from the Registry
 $profileListPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"
 $profileKey = Get-ChildItem $profileListPath | Where-Object {
     $profilePath = (Get-ItemProperty $_.PSPath).ProfileImagePath
@@ -47,24 +47,24 @@ $profileKey = Get-ChildItem $profileListPath | Where-Object {
 
 if ($profileKey) {
     Remove-Item -Path $profileKey.PSPath -Recurse -Force
-    Write-Host "L'utilisateur $userName a été supprimé du registre." -ForegroundColor Green
+    Write-Host "User $userName has been removed from the registry." -ForegroundColor Green
 } else {
-    Write-Host "Utilisateur $userName non trouvé dans le registre." -ForegroundColor Yellow
+    Write-Host "User $userName not found in the registry." -ForegroundColor Yellow
 }
 
-#Renommer le dossier du username en .old
+#Rename the user's folder to .old
 $profileFolder = "C:\Users\$userName"
 $profileFolderOld = "C:\Users\$userName.old"
 
 if (Test-Path $profileFolder) {
     Rename-Item -Path $profileFolder -NewName $profileFolderOld
-    Write-Host "Le dossier de profil utilisateur $userName a été renommé en $userName.old." -ForegroundColor Green
+    Write-Host "The user profile folder $userName has been renamed to $userName.old." -ForegroundColor Green
 } else {
-    Write-Host "Le dossier de profil $userName n'a pas été trouvé." -ForegroundColor Yellow
+    Write-Host "The profile folder $userName was not found." -ForegroundColor Yellow
 }
 
-Write-Host "Reset du profil complété avec succes!"
-$confirmation = Read-Host "Appuyez sur la touche entrée, pour quitter."
+Write-Host "Profile reset completed successfully!"
+$confirmation = Read-Host "Press Enter to exit."
 
 if ($confirmation -eq 'exit' -or $confirmation -eq '') {
 
@@ -72,6 +72,6 @@ if ($confirmation -eq 'exit' -or $confirmation -eq '') {
 
 } else {
 
-    Write-Host "Veuillez cliquer sur la touche entrée, pour quitter!"
-    Read-Host "Appuyez sur entrée."
+    Write-Host "Please press Enter to exit!"
+    Read-Host "Press Enter."
 }
